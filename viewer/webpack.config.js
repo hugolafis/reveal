@@ -47,7 +47,11 @@ module.exports = env => {
     target: 'web',
     resolve: {
       extensions: ['.tsx', '.ts', '.js'],
-      symlinks: true
+      symlinks: true,
+      fallback: {
+        fs: false,
+        path: require.resolve("path-browserify")
+      }
     },
     module: {
       rules: [
@@ -109,13 +113,10 @@ module.exports = env => {
     devtool: development ? 'inline-source-map' : 'source-map',
     watchOptions: {
       aggregateTimeout: 1500,
-      ignored: [/node_modules/]
+      ignored: /node_modules/
     },
     optimization: {
       usedExports: true
-    },
-    node: {
-      fs: 'empty'
     },
     plugins: [
       new copyPkgJsonPlugin({
