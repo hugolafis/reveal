@@ -50,7 +50,7 @@ module.exports = env => {
       symlinks: true,
       fallback: {
         fs: false,
-        path: require.resolve("path-browserify")
+        path: require.resolve('path-browserify')
       }
     },
     module: {
