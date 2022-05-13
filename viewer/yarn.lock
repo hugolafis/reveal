@@ -802,13 +802,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@discoveryjs/json-ext@npm:^0.5.0":
-  version: 0.5.7
-  resolution: "@discoveryjs/json-ext@npm:0.5.7"
-  checksum: 2176d301cc258ea5c2324402997cf8134ebb212469c0d397591636cea8d3c02f2b3cf9fd58dcb748c7a0dade77ebdc1b10284fa63e608c033a1db52fddc69918
-  languageName: node
-  linkType: hard
-
 "@es-joy/jsdoccomment@npm:~0.29.0":
   version: 0.29.0
   resolution: "@es-joy/jsdoccomment@npm:0.29.0"
@@ -8395,13 +8388,6 @@ __metadata:
   checksum: f97f499f898f23e4585742138a22f22526254fdba6d75d41a1c2526b3b6cc5747ef59c5612ba7375f42aca4f8461950e925ba08c991ead0651b4918b7c978297
   languageName: node
   linkType: hard
-
-"lru-cache@npm:^7.4.0":
-  version: 7.8.0
-  resolution: "lru-cache@npm:7.8.0"
-  checksum: 7cc046276b668e7b59c10f7f25049d89315cd22fb5205c0eb476583ba29b8542955189452dc8655a771e1a91f6056ddcb29daf4ac35197f77b3ce9a0041d54c9
-    languageName: node
-    linkType: hard
 
 "make-dir@npm:^2.0.0":
   version: 2.1.0
