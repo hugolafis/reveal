@@ -8,12 +8,12 @@ import { Subscription, combineLatest, asyncScheduler, Subject } from 'rxjs';
 import { map, observeOn, subscribeOn, tap, auditTime, distinctUntilChanged } from 'rxjs/operators';
 import { LoadingStateChangeListener, PointCloudBudget } from './types';
 
-import { CadManager, GeometryFilter, CadModelSectorLoadStatistics } from '@reveal/cad-model';
+import { GeometryFilter, CadModelSectorLoadStatistics, CadNode } from '@reveal/cad-model';
 import { PointCloudManager, PointCloudNode } from '@reveal/pointclouds';
 import { SupportedModelTypes, LoadingState } from '@reveal/model-base';
-import { CadModelBudget } from '@reveal/cad-geometry-loaders';
+import { CadManager, CadModelBudget } from '@reveal/cad-geometry-loaders';
 import { NodeAppearanceProvider } from '@reveal/cad-styling';
-import { RenderOptions, EffectRenderManager, CadNode, defaultRenderOptions, RenderMode } from '@reveal/rendering';
+import { RenderMode, RenderPipelineExecutor, CadMaterialManager, RenderPipelineProvider } from '@reveal/rendering';
 import { MetricsLogger } from '@reveal/metrics';
 import { assertNever, EventTrigger } from '@reveal/utilities';
 
@@ -29,7 +29,8 @@ export type AddCadModelOptions = {
 export class RevealManager {
   private readonly _cadManager: CadManager;
   private readonly _pointCloudManager: PointCloudManager;
-  private readonly _effectRenderManager: EffectRenderManager;
+  private readonly _pipelineExecutor: RenderPipelineExecutor;
+  private readonly _renderPipeline: RenderPipelineProvider;
 
   private readonly _lastCamera = {
     position: new THREE.Vector3(NaN, NaN, NaN),
@@ -44,9 +45,18 @@ export class RevealManager {
   };
 
   private readonly _updateSubject: Subject<void>;
+  private readonly _materialManager: CadMaterialManager;
 
-  constructor(cadManager: CadManager, renderManager: EffectRenderManager, pointCloudManager: PointCloudManager) {
-    this._effectRenderManager = renderManager;
+  constructor(
+    cadManager: CadManager,
+    pointCloudManager: PointCloudManager,
+    pipelineExecutor: RenderPipelineExecutor,
+    renderPipeline: RenderPipelineProvider,
+    materialManager: CadMaterialManager
+  ) {
+    this._pipelineExecutor = pipelineExecutor;
+    this._renderPipeline = renderPipeline;
+    this._materialManager = materialManager;
     this._cadManager = cadManager;
     this._pointCloudManager = pointCloudManager;
     this.initLoadingStateObserver(this._cadManager, this._pointCloudManager);
@@ -66,6 +76,7 @@ export class RevealManager {
       return;
     }
     this._cadManager.dispose();
+    this._renderPipeline.dispose();
     this._subscriptions.unsubscribe();
     this._isDisposed = true;
   }
@@ -80,20 +91,8 @@ export class RevealManager {
     this._pointCloudManager.resetRedraw();
   }
 
-  public get debugRenderTiming(): boolean {
-    return this._effectRenderManager.debugRenderTimings;
-  }
-
-  public set debugRenderTiming(enable: boolean) {
-    this._effectRenderManager.debugRenderTimings = enable;
-  }
-
-  public get renderOptions(): RenderOptions {
-    return this._effectRenderManager.renderOptions;
-  }
-
-  public set renderOptions(options: RenderOptions) {
-    this._effectRenderManager.renderOptions = options ?? defaultRenderOptions;
+  get materialManager(): CadMaterialManager {
+    return this._materialManager;
   }
 
   get needsRedraw(): boolean {
@@ -178,18 +177,8 @@ export class RevealManager {
   }
 
   public render(camera: THREE.PerspectiveCamera): void {
-    this._effectRenderManager.render(camera);
+    this._pipelineExecutor.render(this._renderPipeline, camera);
     this.resetRedraw();
-  }
-
-  /**
-   * Overrides the default rendering target.
-   * @param target New rendering target.
-   * @param autoSetTargetSize Auto size target to fit canvas.
-   */
-  public setRenderTarget(target: THREE.WebGLRenderTarget | null, autoSetTargetSize: boolean = true): void {
-    this._effectRenderManager.setRenderTarget(target);
-    this._effectRenderManager.setRenderTargetAutoSize(autoSetTargetSize);
   }
 
   public addModel(type: 'cad', modelIdentifier: ModelIdentifier, options?: AddCadModelOptions): Promise<CadNode>;
@@ -228,16 +217,6 @@ export class RevealManager {
       default:
         assertNever(type);
     }
-  }
-
-  public addUiObject(object: THREE.Object3D, screenPos: THREE.Vector2, size: THREE.Vector2): void {
-    this._effectRenderManager.addUiObject(object, screenPos, size);
-    this.requestRedraw();
-  }
-
-  public removeUiObject(object: THREE.Object3D): void {
-    this._effectRenderManager.removeUiObject(object);
-    this.requestRedraw();
   }
 
   private notifyLoadingStateChanged(loadingState: LoadingState) {

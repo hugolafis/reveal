@@ -19,7 +19,6 @@ import {
 } from '@cognite/reveal';
 import { DebugCameraTool, DebugLoadedSectorsTool, DebugLoadedSectorsToolOptions, ExplodedViewTool, AxisViewTool } from '@cognite/reveal/tools';
 import * as reveal from '@cognite/reveal';
-import { CadNode } from '@cognite/reveal/internals';
 import { ClippingUI } from '../utils/ClippingUI';
 import { NodeStylingUI } from '../utils/NodeStylingUI';
 import { BulkHtmlOverlayUI } from '../utils/BulkHtmlOverlayUI';
@@ -149,8 +148,7 @@ export function Migration() {
         controls: {
           mouseWheelAction: 'zoomToCursor',
           changeCameraTargetOnClick: true
-        },
-        debugRenderStageTimings: false
+        }
       };
       const guiActions = {
         showSectorBoundingBoxes: () => {
@@ -183,6 +181,7 @@ export function Migration() {
           new BulkHtmlOverlayUI(gui.addFolder(`Node tagging #${modelUi.cadModels.length}`), viewer, model, client);
         } else if (model instanceof CognitePointCloudModel) {
           new PointCloudClassificationFilterUI(gui.addFolder(`Class filter #${modelUi.pointCloudModels.length}`), model);
+          pointCloudUi.applyToAllModels();
         }
       }
       const modelUi = new ModelUi(gui.addFolder('Models'), viewer, handleModelAdded);
@@ -191,10 +190,7 @@ export function Migration() {
       const renderModes = ['Color', 'Normal', 'TreeIndex', 'PackColorAndNormal', 'Depth', 'Effects', 'Ghost', 'LOD', 'DepthBufferOnly (N/A)', 'GeometryType'];
       renderGui.add(guiState, 'renderMode', renderModes).name('Render mode').onFinishChange(value => {
         const renderMode = renderModes.indexOf(value) + 1;
-        modelUi.cadModels.forEach(m => {
-          const cadNode: CadNode = (m as any).cadNode;
-          cadNode.renderMode = renderMode;
-        });
+        (viewer as any).revealManager._renderPipeline._cadGeometryRenderPipeline._cadGeometryRenderPasses.back._renderMode = renderMode;
         viewer.requestRedraw();
       });
       renderGui.add(guiState, 'antiAliasing',
@@ -211,11 +207,6 @@ export function Migration() {
         ]).name('SSAO').onFinishChange(v => {
           urlParams.set('ssao', v);
           window.location.href = url.toString();
-        });
-      renderGui.add(guiState, 'debugRenderStageTimings')
-        .name('Debug timings')
-        .onChange(enabled => {
-          (viewer as any).revealManager.debugRenderTiming = enabled;
         });
 
       const debugGui = gui.addFolder('Debug');
@@ -305,7 +296,7 @@ export function Migration() {
 
       const clippingUi = new ClippingUI(gui.addFolder('Clipping'), planes => viewer.setClippingPlanes(planes));
       new CameraUI(viewer, gui.addFolder('Camera'));
-      new PointCloudUi(viewer, gui.addFolder('Point clouds'));
+      const pointCloudUi = new PointCloudUi(viewer, gui.addFolder('Point clouds'));
       await modelUi.restoreModelsFromUrl();
 
       let expandTool: ExplodedViewTool | null;
@@ -367,7 +358,7 @@ export function Migration() {
         cameraManager.setCameraControlsOptions({ ...cameraManager.getCameraControlsOptions(), changeCameraTargetOnClick: value });
       });
 
-      const inspectNodeUi = new InspectNodeUI(gui.addFolder('Last clicked node'), client);
+      const inspectNodeUi = new InspectNodeUI(gui.addFolder('Last clicked node'), client, viewer);
 
       viewer.on('click', async (event) => {
         const { offsetX, offsetY } = event; 
