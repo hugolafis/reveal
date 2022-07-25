@@ -7,7 +7,7 @@ export class PointCloudUi {
     {
       pointSize: 1.0,
       pointSizeType: PotreePointSizeType.Adaptive,
-      budget: 2_000_000,
+      budget: 10_000_000,
       pointColorType: PotreePointColorType.Rgb,
       pointShape: PotreePointShape.Circle,
     };
@@ -17,10 +17,10 @@ export class PointCloudUi {
 
     ui.add(this._params, 'budget', 0, 20_000_000, 100_000).onChange(() => this.applyToAllModels());
     ui.add(this._params, 'pointSize', 0, 2, 0.025).onChange(() => this.applyToAllModels());
-    ui.add(this._params, 'pointSizeType', { 
-      Adaptive: PotreePointSizeType.Adaptive, 
-      Attenuated: PotreePointSizeType.Attenuated, 
-      Fixed: PotreePointSizeType.Fixed 
+    ui.add(this._params, 'pointSizeType', {
+      Adaptive: PotreePointSizeType.Adaptive,
+      Attenuated: PotreePointSizeType.Attenuated,
+      Fixed: PotreePointSizeType.Fixed
     }).onChange(() => this.applyToAllModels());
     ui.add(this._params, 'pointColorType', {
       Rgb: PotreePointColorType.Rgb,

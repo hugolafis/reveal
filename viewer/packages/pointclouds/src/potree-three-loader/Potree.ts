@@ -31,7 +31,6 @@ import { IPointCloudTreeNodeBase } from './tree/IPointCloudTreeNodeBase';
 import { IPointCloudTreeNode } from './tree/IPointCloudTreeNode';
 import { IPointCloudTreeGeometryNode } from './geometry/IPointCloudTreeGeometryNode';
 import { BinaryHeap } from './utils/BinaryHeap';
-import { Box3Helper } from './utils/box3-helper';
 import { LRU } from './utils/lru';
 import { ModelDataProvider } from '@reveal/modeldata-api';
 import throttle from 'lodash/throttle';
@@ -89,7 +88,7 @@ export class Potree implements IPotree {
     _xhrRequest = (input: RequestInfo, init?: RequestInit) => fetch(input, init)
   ): Promise<PointCloudOctree> {
     return EptLoader.load(baseUrl, fileName, this._modelDataProvider).then(
-      geometry => new PointCloudOctree(this, geometry)
+      metadata => new PointCloudOctree(this, metadata)
     );
   }
 
@@ -111,8 +110,6 @@ export class Potree implements IPotree {
       }
 
       pointCloud.material.updateMaterial(pointCloud, pointCloud.visibleNodes, camera, renderer);
-      pointCloud.updateVisibleBounds();
-      pointCloud.updateBoundingBoxes();
     }
 
     this.lru.freeMemory();
@@ -151,6 +148,18 @@ export class Potree implements IPotree {
     return EptBinaryLoader.WORKER_POOL.maxWorkers;
   }
 
+  private shouldCullEarly(node: IPointCloudTreeNodeBase,
+                          pointCloud: PointCloudOctree,
+                          pointCloudIndex: number,
+                          sceneParams: VisibilitySceneParameters) {
+    const maxLevel = pointCloud.maxLevel !== undefined ? pointCloud.maxLevel : Infinity;
+
+
+    return node.level > maxLevel ||
+      !sceneParams.frustums[pointCloudIndex].intersectsBox(node.boundingBox) ||
+      this.shouldClip(pointCloud, node.boundingBox)
+  }
+
   private updateVisibilityForNode(
     node: IPointCloudTreeNodeBase,
     updateInfo: VisibilityUpdateInfo,
@@ -160,13 +169,7 @@ export class Potree implements IPotree {
     const pointCloudIndex = queueItem.pointCloudIndex;
     const pointCloud = sceneParams.pointClouds[pointCloudIndex];
 
-    const maxLevel = pointCloud.maxLevel !== undefined ? pointCloud.maxLevel : Infinity;
-
-    if (
-      node.level > maxLevel ||
-      !sceneParams.frustums[pointCloudIndex].intersectsBox(node.boundingBox) ||
-      this.shouldClip(pointCloud, node.boundingBox)
-    ) {
+    if (this.shouldCullEarly(node, pointCloud, pointCloudIndex, sceneParams)) {
       return;
     }
 
@@ -198,7 +201,7 @@ export class Potree implements IPotree {
     const halfHeight =
       0.5 * sceneParams.renderer.getSize(this._rendererSize).height * sceneParams.renderer.getPixelRatio();
 
-    this.updateChildVisibility(
+    this.addChildrenToQueue(
       queueItem,
       updateInfo.priorityQueue,
       pointCloud,
@@ -222,7 +225,7 @@ export class Potree implements IPotree {
     };
   }
 
-  private updateVisibility(
+  private updateAndLoadNodes(
     pointClouds: PointCloudOctree[],
     camera: Camera,
     renderer: WebGLRenderer
@@ -278,6 +281,7 @@ export class Potree implements IPotree {
       );
     }
 
+    console.log("loaded nodes = ", updateInfo.visibleNodes.map(n => n.name));
     return this.createVisibilityUpdateResult(updateInfo, nodeLoadPromises);
   }
 
@@ -296,11 +300,9 @@ export class Potree implements IPotree {
 
     visibleNodes.push(node);
     pointCloud.visibleNodes.push(node);
-
-    this.updateBoundingBoxVisibility(pointCloud, node);
   }
 
-  private updateChildVisibility(
+  private addChildrenToQueue(
     queueItem: QueueItem,
     priorityQueue: BinaryHeap<QueueItem>,
     pointCloud: PointCloudOctree,
@@ -341,23 +343,10 @@ export class Potree implements IPotree {
 
       // Nodes which are larger will have priority in loading/displaying.
       const weight = distance < radius ? Number.MAX_VALUE : screenPixelRadius + 1 / distance;
-
+      if (child.name === 'r07' || child.name === 'r6') {
+        console.log('Weight for ', child.name, ' = ', weight);
+      }
       priorityQueue.push(new QueueItem(queueItem.pointCloudIndex, weight, child, node));
-    }
-  }
-
-  private updateBoundingBoxVisibility(pointCloud: PointCloudOctree, node: IPointCloudTreeNode): void {
-    if (pointCloud.showBoundingBox && !node.boundingBoxNode) {
-      const boxHelper = new Box3Helper(node.boundingBox);
-      boxHelper.matrixAutoUpdate = false;
-      pointCloud.boundingBoxNodes.push(boxHelper);
-      node.boundingBoxNode = boxHelper;
-      node.boundingBoxNode.matrix.copy(pointCloud.matrixWorld);
-    } else if (pointCloud.showBoundingBox && node.boundingBoxNode) {
-      node.boundingBoxNode.visible = true;
-      node.boundingBoxNode.matrix.copy(pointCloud.matrixWorld);
-    } else if (!pointCloud.showBoundingBox && node.boundingBoxNode) {
-      node.boundingBoxNode.visible = false;
     }
   }
 
@@ -435,10 +424,6 @@ export class Potree implements IPotree {
         // Hide any previously visible nodes. We will later show only the needed ones.
         if (isTreeNode(pointCloud.root)) {
           pointCloud.hideDescendants(pointCloud.root!.sceneNode);
-        }
-
-        for (const boundingBoxNode of pointCloud.boundingBoxNodes) {
-          boundingBoxNode.visible = false;
         }
       }
 

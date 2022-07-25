@@ -11,6 +11,6 @@ export function isTreeNode(node?: IPointCloudTreeNodeBase): node is IPointCloudT
 }
 
 // Equivalent to (!node || isTreeNode(node))
-export function isOptionalTreeNode(node?: IPointCloudTreeNodeBase): node is IPointCloudTreeNode | undefined {
+export function isOptionalTreeNode(node?: IPointCloudTreeNodeBase | undefined): node is IPointCloudTreeNode | undefined {
   return !node || node.isTreeNode;
 }

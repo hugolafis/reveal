@@ -7,7 +7,7 @@
 import { IPointCloudTreeGeometryNode } from './IPointCloudTreeGeometryNode';
 import { IPointCloudTreeNodeBase } from '../tree/IPointCloudTreeNodeBase';
 import * as THREE from 'three';
-import { PointCloudEptGeometry, EptKey } from './PointCloudEptGeometry';
+import { PointCloudEptMetadata, EptKey } from './PointCloudEptMetadata';
 import { sphereFrom } from './translationUtils';
 
 import {
@@ -17,10 +17,11 @@ import {
   decrementGlobalNumNodesLoading
 } from '../loading/globalLoadingCounter';
 import { ModelDataProvider } from '@reveal/modeldata-api';
+import { PointCloudOctree } from '../tree/PointCloudOctree';
 
 export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
   private readonly _id: number;
-  private readonly _ept: PointCloudEptGeometry;
+  private readonly _ept: PointCloudEptMetadata;
   private readonly _key: EptKey;
 
   private readonly _dataLoader: ModelDataProvider;
@@ -106,7 +107,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
     return this._geometry!;
   }
 
-  get ept(): PointCloudEptGeometry {
+  get ept(): PointCloudEptMetadata {
     return this._ept;
   }
 
@@ -123,7 +124,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
   }
 
   constructor(
-    ept: PointCloudEptGeometry,
+    ept: PointCloudEptMetadata,
     modelDataProvider: ModelDataProvider,
     b?: THREE.Box3,
     d?: number,
@@ -132,7 +133,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
     z?: number
   ) {
     this._ept = ept;
-    this._key = new EptKey(this._ept, b || this._ept.boundingBox, d || 0, x, y, z);
+    this._key = new EptKey(b || this._ept.boundingBox, d || 0, x, y, z);
 
     this._dataLoader = modelDataProvider;
 
@@ -140,7 +141,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
 
     this._id = PointCloudEptGeometryNode.IDCount++;
     this._geometry = undefined;
-    this._boundingBox = this._key.b;
+    this._boundingBox = this._key.boundingBox;
     this._spacing = this._ept.spacing / Math.pow(2, this._key.d);
     this._boundingSphere = sphereFrom(this._boundingBox);
 
@@ -181,7 +182,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
   }
 
   baseUrl(): string {
-    return this._ept.url + 'ept-data';
+    return this._ept.baseUrl + '/ept-data';
   }
 
   getNumPoints(): number {
@@ -245,7 +246,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
     const nodes: { [key: string]: PointCloudEptGeometryNode } = {};
     nodes[this.fileName()] = this;
 
-    const baseUrl = `${this.ept.url}ept-hierarchy`;
+    const baseUrl = `${this.ept.baseUrl}/ept-hierarchy`;
     const fileName = `${this.fileName()}.json`;
 
     const hier = await this._dataLoader.getJsonFile(baseUrl, fileName);
@@ -278,7 +279,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
 
       const key = parentNode.key.step(a, b, c);
 
-      const node = new PointCloudEptGeometryNode(this.ept, this._dataLoader, key.b, key.d, key.x, key.y, key.z);
+      const node = new PointCloudEptGeometryNode(this.ept, this._dataLoader, key.boundingBox, key.d, key.x, key.y, key.z);
 
       node._level = d;
       node._numPoints = hier[v];
@@ -299,6 +300,7 @@ export class PointCloudEptGeometryNode implements IPointCloudTreeGeometryNode {
     this._numPoints = np;
     this._loaded = true;
     this._loading = false;
+
     decrementGlobalNumNodesLoading();
   }
 

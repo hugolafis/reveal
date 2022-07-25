@@ -30,8 +30,6 @@ export class PointCloudOctree extends PointCloudTree {
   visibleNodes: IPointCloudTreeNode[] = [];
   visibleGeometry: IPointCloudTreeGeometryNode[] = [];
   numVisiblePoints: number = 0;
-  showBoundingBox: boolean = false;
-  private readonly visibleBounds: Box3 = new Box3();
   private picker: PointCloudOctreePicker | undefined;
 
   constructor(potree: IPotree, pcoGeometry: IPointCloudTreeGeometry, material?: PointCloudMaterial) {
@@ -91,12 +89,16 @@ export class PointCloudOctree extends PointCloudTree {
     points.frustumCulled = false;
     points.onBeforeRender = PointCloudMaterial.makeOnBeforeRender(this, node);
 
+    console.log('Making node', geometryNode.name, 'into a tree node');
+
     if (parent) {
       parent.sceneNode.add(points);
       parent.children[geometryNode.index] = node;
 
       geometryNode.oneTimeDisposeHandlers.push(() => {
+        console.log("Disposing of node ", node.name);
         node.disposeSceneNode();
+
         parent.sceneNode.remove(node.sceneNode);
         // Replace the tree node (rendered and in the GPU) with the geometry node.
         parent.children[geometryNode.index] = geometryNode;
@@ -107,41 +109,6 @@ export class PointCloudOctree extends PointCloudTree {
     }
 
     return node;
-  }
-
-  updateVisibleBounds(): void {
-    const bounds = this.visibleBounds;
-    bounds.min.set(Infinity, Infinity, Infinity);
-    bounds.max.set(-Infinity, -Infinity, -Infinity);
-
-    for (const node of this.visibleNodes) {
-      if (node.isLeafNode) {
-        bounds.expandByPoint(node.boundingBox.min);
-        bounds.expandByPoint(node.boundingBox.max);
-      }
-    }
-  }
-
-  updateBoundingBoxes(): void {
-    if (!this.showBoundingBox || !this.parent) {
-      return;
-    }
-
-    let bbRoot: any = this.parent.getObjectByName('bbroot');
-    if (!bbRoot) {
-      bbRoot = new Object3D();
-      bbRoot.name = 'bbroot';
-      this.parent.add(bbRoot);
-    }
-
-    const visibleBoxes: (Object3D | null)[] = [];
-    for (const node of this.visibleNodes) {
-      if (node.boundingBoxNode !== undefined && node.isLeafNode) {
-        visibleBoxes.push(node.boundingBoxNode);
-      }
-    }
-
-    bbRoot.children = visibleBoxes;
   }
 
   updateMatrixWorld(force: boolean): void {
@@ -181,30 +148,8 @@ export class PointCloudOctree extends PointCloudTree {
     }
   }
 
-  moveToOrigin(): void {
-    this.position.set(0, 0, 0); // Reset, then the matrix will be updated in getBoundingBoxWorld()
-    this.position.set(0, 0, 0).sub(this.getBoundingBoxWorld().getCenter(new Vector3()));
-  }
-
-  moveToGroundPlane(): void {
-    this.position.y += -this.getBoundingBoxWorld().min.y;
-  }
-
-  getBoundingBoxWorld(): Box3 {
-    this.updateMatrixWorld(true);
-    return computeTransformedBoundingBox(this.boundingBox, this.matrixWorld);
-  }
-
-  getVisibleExtent(): Box3 {
-    return this.visibleBounds.applyMatrix4(this.matrixWorld);
-  }
-
   pick(renderer: WebGLRenderer, camera: Camera, ray: Ray, params: Partial<PickParams> = {}): PickPoint | null {
     this.picker = this.picker || new PointCloudOctreePicker();
     return this.picker.pick(renderer, camera, ray, [this], params);
-  }
-
-  get progress(): number {
-    return this.visibleGeometry.length === 0 ? 0 : this.visibleNodes.length / this.visibleGeometry.length;
   }
 }
