@@ -6,6 +6,7 @@ import { StylableObject } from '../../styling/StylableObject';
 import { assignPoints } from '../../../wasm';
 import { Cylinder } from '../../styling/shapes/Cylinder';
 import { Box } from '../../styling/shapes/Box';
+import { AABB, Vec3 } from '../../styling/shapes/linalg';
 
 function getWasmShape(obj: StylableObject): any {
   if (obj.shape instanceof Cylinder) {
@@ -34,16 +35,16 @@ function getWasmShape(obj: StylableObject): any {
 export async function assignPointsWithWasm(
   points: Float32Array,
   objects: StylableObject[],
-  pointOffset: THREE.Vector3,
-  sectorBoundingBox: THREE.Box3
+  pointOffset: Vec3,
+  sectorBoundingBox: AABB
 ): Promise<Uint16Array> {
   const wasmShapes = objects.map(obj => getWasmShape(obj));
 
   const res = assignPoints(
     wasmShapes,
     points,
-    { min: sectorBoundingBox.min.toArray(), max: sectorBoundingBox.max.toArray() },
-    pointOffset.toArray()
+    sectorBoundingBox,
+    pointOffset
   );
 
   return res;

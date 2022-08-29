@@ -4,10 +4,12 @@
 
 import { IRawShape } from './IRawShape';
 
-import { Vec3 } from './linalg';
+import * as THREE from 'three';
 
 export interface IShape {
-  containsPoint(point: Vec3): boolean;
+  containsPoint(point: THREE.Vector3): boolean;
 
   toRawShape(): IRawShape;
+
+  createBoundingBox(): THREE.Box3;
 }
